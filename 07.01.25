@@ -1,0 +1,219 @@
+import pygame
+import random
+import sys
+import os
+
+# Initialize pygame
+pygame.init()
+
+# Dimensions
+WIDTH, HEIGHT = 400, 500
+GRID_SIZE = 4
+GRID_WIDTH = 400
+GRID_HEIGHT = 400
+TILE_SIZE = GRID_WIDTH // GRID_SIZE
+BACKGROUND_COLOR = (187, 173, 160)
+GRID_COLOR = (205, 193, 180)
+FONT_COLOR = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+# Directions
+UP = 'up'
+DOWN = 'down'
+LEFT = 'left'
+RIGHT = 'right'
+
+# Key bindings
+KEY_BINDINGS = {
+    pygame.K_LEFT: LEFT,
+    pygame.K_RIGHT: RIGHT,
+    pygame.K_UP: UP,
+    pygame.K_DOWN: DOWN
+}
+
+# Font
+FONT = pygame.font.SysFont('clearsans', 40)
+
+# Screen setup
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption('2048')
+
+# Path to image
+image_path = 'IMG_4074.jpeg'
+
+# Check if the image exists
+if not os.path.isfile(image_path):
+    print(f"Error: Image file {image_path} not found!")
+    pygame.quit()
+    sys.exit()
+
+# Load a single image for all tiles
+tile_image = pygame.image.load('IMG_4074.jpeg').convert_alpha()  # Make sure 'tile.png' exists
+
+# Initialize the grid
+def initialize_grid():
+    grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
+    return grid
+
+# Add new tile
+def add_new_tile(grid):
+    empty_cells = [(x, y) for x in range(GRID_SIZE) for y in range(GRID_SIZE) if grid[x][y] == 0]
+    if empty_cells:
+        x, y = random.choice(empty_cells)
+        grid[x][y] = 2 if random.random() < 0.9 else 4
+
+# Draw the grid
+def draw_grid(grid):
+    screen.fill(BACKGROUND_COLOR)  # Fill the background with color (or use image)
+    
+
+
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            # For all tile values, display the same image
+            screen.blit(tile_image, (y * TILE_SIZE, x * TILE_SIZE))
+
+            tile_value = grid[x][y]
+            if tile_value != 0:
+                # Optionally, draw the value on the tile in the center if not zero
+                text = FONT.render(str(tile_value), True, FONT_COLOR)
+                screen.blit(text, (y * TILE_SIZE + TILE_SIZE // 2 - text.get_width() // 2,
+                                   x * TILE_SIZE + TILE_SIZE // 2 - text.get_height() // 2))
+
+    draw_score()
+
+# Draw the score
+def draw_score():
+    score_text = FONT.render("Points: " + str(score), True, FONT_COLOR)
+    screen.blit(score_text, (10, HEIGHT - 40))
+
+# Move the grid
+def move(grid, direction):
+    def move_row(row):
+        row = [x for x in row if x != 0]
+        while len(row) < GRID_SIZE:
+            row.append(0)
+        return row
+
+    def merge_row(row):
+        global score
+        for i in range(GRID_SIZE - 1):
+            if row[i] == row[i + 1] and row[i] != 0:
+                row[i] *= 2
+                row[i + 1] = 0
+                score += row[i]
+        return row
+
+    def move_left(grid):
+        new_grid = []
+        for row in grid:
+            new_row = move_row(row)
+            new_row = merge_row(new_row)
+            new_grid.append(move_row(new_row))
+        return new_grid
+
+    def move_right(grid):
+        reversed_grid = [row[::-1] for row in grid]
+        new_grid = move_left(reversed_grid)
+        return [row[::-1] for row in new_grid]
+
+    def move_up(grid):
+        transposed_grid = [[grid[j][i] for j in range(GRID_SIZE)] for i in range(GRID_SIZE)]
+        new_grid = move_left(transposed_grid)
+        return [[new_grid[j][i] for j in range(GRID_SIZE)] for i in range(GRID_SIZE)]
+
+    def move_down(grid):
+        transposed_grid = [[grid[j][i] for j in range(GRID_SIZE)] for i in range(GRID_SIZE)]
+        new_grid = move_right(transposed_grid)
+        return [[new_grid[j][i] for j in range(GRID_SIZE)] for i in range(GRID_SIZE)]
+
+    moves = {
+        UP: move_up,
+        DOWN: move_down,
+        LEFT: move_left,
+        RIGHT: move_right
+    }
+
+    if direction in moves:
+        return moves[direction](grid)
+    else:
+        return grid
+
+# Check if the game is over
+def is_game_over(grid):
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            if grid[x][y] == 0:
+                return False
+            if x != GRID_SIZE - 1 and grid[x][y] == grid[x + 1][y]:
+                return False
+            if y != GRID_SIZE - 1 and grid[x][y] == grid[x][y + 1]:
+                return False
+    return True
+
+# Display "game over" screen
+def display_game_over():
+    text = FONT.render('Game Over', True, FONT_COLOR)
+    screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
+    pygame.display.update()
+    pygame.time.wait(2000)
+
+# Handle events
+def handle_events(grid):
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.KEYDOWN:
+            if event.key in KEY_BINDINGS:
+                direction = KEY_BINDINGS[event.key]
+                new_grid = move(grid, direction)
+                if new_grid != grid:
+                    add_new_tile(new_grid)
+                    draw_grid(new_grid)
+                    pygame.display.update()
+                    return new_grid
+    return grid
+
+# Start screen
+def start_screen():
+    screen.fill(BACKGROUND_COLOR)
+    start_button_text = FONT.render('Start Game', True, FONT_COLOR)
+    start_button_rect = pygame.Rect(WIDTH // 2 - start_button_text.get_width() // 2, HEIGHT // 2 - 50, start_button_text.get_width(), start_button_text.get_height())
+    pygame.draw.rect(screen, GRID_COLOR, start_button_rect)
+    screen.blit(start_button_text, (WIDTH // 2 - start_button_text.get_width() // 2, HEIGHT // 2 - 50))
+    pygame.display.update()
+
+    waiting_for_click = True
+    while waiting_for_click:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if start_button_rect.collidepoint(event.pos):
+                    waiting_for_click = False
+
+# Main game loop
+def main():
+    global score
+    score = 0
+    start_screen()  # Show the start screen
+
+    grid = initialize_grid()
+    add_new_tile(grid)
+    add_new_tile(grid)
+
+    while True:
+        screen.fill(BACKGROUND_COLOR)
+        draw_grid(grid)
+        pygame.display.update()
+        if is_game_over(grid):
+            display_game_over()
+            pygame.quit()
+            sys.exit()
+        grid = handle_events(grid)
+
+# Run the game
+if __name__ == '__main__':
+    main()
